@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init
+  namespace: sa-p5
+data:
+  actors.sql: |
+    CREATE DATABASE IF NOT EXISTS actors_db;
+    USE actors_db;
+    CREATE TABLE IF NOT EXISTS actors (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      name VARCHAR(255) NOT NULL,
+      birth_year INT
+    );
+
+  movies.sql: |
+    CREATE DATABASE IF NOT EXISTS movies_db;
+    USE movies_db;
+    CREATE TABLE IF NOT EXISTS movies (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      title VARCHAR(255) NOT NULL,
+      year INT,
+      genre VARCHAR(100)
+    );
+    CREATE TABLE IF NOT EXISTS movies_actors (
+      movie_id INT,
+      actor_id INT,
+      PRIMARY KEY(movie_id, actor_id)
+    );
+
+  reviews.sql: |
+    CREATE DATABASE IF NOT EXISTS reviews_db;
+    USE reviews_db;
+    CREATE TABLE IF NOT EXISTS reviews (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      user_id INT,
+      movie_id INT,
+      comment TEXT,
+      rating INT
+    );
+
+  users.sql: |
+    CREATE DATABASE IF NOT EXISTS users_db;
+    USE users_db;
+    CREATE TABLE IF NOT EXISTS users (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) UNIQUE NOT NULL
+    );
+
+  grants.sql: |
+    -- Crea usuario appuser y permisos para todas las DB
+    CREATE USER IF NOT EXISTS 'appuser'@'%' IDENTIFIED BY 'apppass';
+    GRANT ALL PRIVILEGES ON actors_db.*  TO 'appuser'@'%';
+    GRANT ALL PRIVILEGES ON movies_db.*  TO 'appuser'@'%';
+    GRANT ALL PRIVILEGES ON reviews_db.* TO 'appuser'@'%';
+    GRANT ALL PRIVILEGES ON users_db.*   TO 'appuser'@'%';
+    FLUSH PRIVILEGES;

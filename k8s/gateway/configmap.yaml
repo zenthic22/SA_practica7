@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: sa-p5
+data:
+  PORT: "4001"
+  ACTORS_SERVICE: "http://actors.sa-p5.svc.cluster.local:4000"
+  MOVIES_SERVICE: "http://movies.sa-p5.svc.cluster.local:3000"
+  REVIEWS_SERVICE: "http://reviews.sa-p5.svc.cluster.local:5002"
+  USERS_SERVICE: "http://users.sa-p5.svc.cluster.local:5003"

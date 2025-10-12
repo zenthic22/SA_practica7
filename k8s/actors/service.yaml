@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: actors
+  namespace: sa-p5
+  labels:
+    app: actors
+    app.kubernetes.io/name: actors
+spec:
+  selector:
+    app: actors
+  ports:
+    - name: http
+      port: 4000
+      targetPort: http
+  type: ClusterIP

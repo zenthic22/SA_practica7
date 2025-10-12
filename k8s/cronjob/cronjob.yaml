@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-insert
+  namespace: sa-p5
+spec:
+  schedule: "*/2 * * * *"               # cada 2 minutos
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 120
+      template:
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+          containers:
+            - name: runner
+              image: docker.io/zenthic22/cron-insert:v1   # <--- tu imagen
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: DB_HOST
+                  value: "mysql.sa-p5.svc.cluster.local"
+                - name: DB_PORT
+                  value: "3306"
+                - name: DB_NAME
+                  value: "cron_db"
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: mysql-secret
+                      key: MYSQL_USER
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: mysql-secret
+                      key: MYSQL_PASSWORD
+                - name: CARNET
+                  value: "201807169"
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "64Mi"
+                limits:
+                  cpu: "200m"
+                  memory: "128Mi"

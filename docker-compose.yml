@@ -1,0 +1,75 @@
+version: '3.9'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - microservices_net
+
+  actors:
+    build: ./actors
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./actors/.env
+    depends_on:
+      - mysql
+    networks:
+      - microservices_net
+
+  movies:
+    build: ./movies
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./movies/.env
+    depends_on:
+      - mysql
+    networks:
+      - microservices_net
+
+  reviews:
+    build: ./reviews
+    ports:
+      - "5002:5002"
+    env_file:
+      - ./reviews/.env
+    depends_on:
+      - mysql
+    networks:
+      - microservices_net
+
+  users:
+    build: ./users
+    ports:
+      - "5003:5003"
+    env_file:
+      - ./users/.env
+    depends_on:
+      - mysql
+    networks:
+      - microservices_net
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "4001:4001"
+    env_file:
+      - ./gateway/.env
+    depends_on:
+      - actors
+      - movies
+      - reviews
+      - users
+    networks:
+      - microservices_net
+
+networks:
+  microservices_net:
+    driver: bridge
