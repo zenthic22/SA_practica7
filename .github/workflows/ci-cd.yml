@@ -136,16 +136,16 @@ jobs:
           EOS
           chmod +x deploy.sh
 
-      - name: Copy k8s/ and script to master
+      - name: Copy repo (k8s/ + script) to master
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          # ** copia todo k8s (archivos y subcarpetas) + script
-          source: "k8s/**,deploy.sh"
-          target: "/home/${{ secrets.SSH_USER }}/sa-p5/"
+            host: ${{ secrets.SSH_HOST }}
+            username: ${{ secrets.SSH_USER }}
+            key: ${{ secrets.SSH_KEY }}
+            # passphrase: ${{ secrets.SSH_PASSPHRASE }}   # <-- solo si tu llave tiene passphrase
+            port: 22
+            source: "./k8s/**,deploy.sh"
+            target: "/home/${{ secrets.SSH_USER }}/sa-p5/"
 
       - name: SSH deploy
         uses: appleboy/ssh-action@v1.2.0
