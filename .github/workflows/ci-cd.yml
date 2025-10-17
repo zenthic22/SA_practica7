@@ -164,36 +164,35 @@ jobs:
           EOS
           chmod +x deploy.sh
 
-      - name: Copy k8s/ and script to master
+      - name: Copy repo (k8s/ + script) to master
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          source: "./k8s/**,deploy.sh"
-          target: "/home/${{ secrets.SSH_USER }}/sa-p5/"
+            host: ${{ secrets.SSH_HOST }}
+            username: ${{ secrets.SSH_USER }}
+            key: ${{ secrets.SSH_KEY }}
+            port: 22
+            source: "./k8s/**,deploy.sh"
+            target: "/home/${{ secrets.SSH_USER }}/sa-p5/"
 
       - name: SSH deploy
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          port: 22
-          script_stop: true
-          command_timeout: 30m
-          envs: REPO
-          script: |
-            set -euo pipefail
-            export REPO="${REPO:-zenthic22}"
-            mkdir -p ~/sa-p5
-            cd ~/sa-p5
-            # kubeconfig del master
-            if [ ! -f ~/.kube/config ]; then
-              mkdir -p ~/.kube
-              sudo cat /etc/kubernetes/admin.conf > ~/.kube/config
-              chmod 600 ~/.kube/config
-            fi
-            ./deploy.sh "${{ steps.tag.outputs.TAG }}"
+            host: ${{ secrets.SSH_HOST }}
+            username: ${{ secrets.SSH_USER }}
+            key: ${{ secrets.SSH_KEY }}
+            port: 22
+            script_stop: true
+            command_timeout: 30m
+            envs: REPO
+            script: |
+                set -euo pipefail
+                echo "[preflight] whoami: $(whoami), host: $(hostname)"
+                mkdir -p ~/sa-p5
+                cd ~/sa-p5
+                # kubeconfig del master
+                if [ ! -f ~/.kube/config ]; then
+                    mkdir -p ~/.kube
+                    sudo cat /etc/kubernetes/admin.conf > ~/.kube/config
+                    chmod 600 ~/.kube/config
+                fi
+                ./deploy.sh "${{ steps.tag.outputs.TAG }}"
