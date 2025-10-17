@@ -6,9 +6,10 @@ on:
   workflow_dispatch:
 
 env:
+  REGISTRY_USER: ${{ secrets.DOCKERHUB_USER }}
+  REGISTRY_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
   REGISTRY: docker.io
   REPO: zenthic22
-  # Lista de microservicios (carpetas a construir)
   SERVICES: |
     gateway
     movies
@@ -21,9 +22,7 @@ jobs:
   build_push:
     name: Build & Push Docker images
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    permissions: { contents: read, packages: write }
 
     steps:
       - name: Checkout
@@ -39,11 +38,11 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USER }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_TOKEN }}
 
-      - name: Build & Push (matrix-like loop)
+      - name: Build & Push (loop)
         run: |
           set -euo pipefail
           TAG=${{ steps.vars.outputs.SHORT_SHA }}
@@ -52,7 +51,7 @@ jobs:
               cronjob-runner) ctx="cronjob-runner"; img="$REPO/cronjob";;
               *)               ctx="$svc";           img="$REPO/$svc";;
             esac
-            echo "==> Building $REGISTRY/$img:{latest,$TAG} from $ctx"
+            echo "==> Building $img from $ctx"
             docker build -t $REGISTRY/$img:latest -t $REGISTRY/$img:$TAG $ctx
             docker push $REGISTRY/$img:latest
             docker push $REGISTRY/$img:$TAG
@@ -62,14 +61,10 @@ jobs:
           REPO: ${{ env.REPO }}
           SERVICES: ${{ env.SERVICES }}
 
-      - name: Export image tags (artifact)
-        run: echo "${{ steps.vars.outputs.SHORT_SHA }}" > image_tag.txt
-
       - name: Upload image tag artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: image_tag
-          path: image_tag.txt
+        run: echo "${{ steps.vars.outputs.SHORT_SHA }}" > image_tag.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: image_tag, path: image_tag.txt }
 
   deploy_via_ssh:
     name: Deploy to K8s (via SSH on master)
@@ -82,9 +77,7 @@ jobs:
 
       - name: Download image tag
         uses: actions/download-artifact@v4
-        with:
-          name: image_tag
-          path: .
+        with: { name: image_tag, path: . }
 
       - name: Read tag
         id: tag
@@ -97,6 +90,7 @@ jobs:
 
           NS=sa-p5
           TAG="$1"
+          TIMEOUT=300s
 
           echo "[*] kubectl context:"
           kubectl cluster-info || true
@@ -113,38 +107,73 @@ jobs:
           kubectl -n "$NS" apply -f k8s/gateway/
           kubectl -n "$NS" apply -f k8s/cronjob/
 
+          # Función helper para esperar rollout con diagnóstico en fallo
+          wait_rollout() {
+            local kind="$1" name="$2" label="$3"
+            echo "[*] Waiting rollout $kind/$name ..."
+            if ! kubectl -n "$NS" rollout status "$kind/$name" --timeout="$TIMEOUT"; then
+              echo "[!] Rollout failed for $kind/$name. Dumping diagnostics..."
+              kubectl -n "$NS" describe "$kind/$name" || true
+              [ -n "$label" ] && kubectl -n "$NS" get pods -l "$label" -o wide || true
+              [ -n "$label" ] && kubectl -n "$NS" describe pods -l "$label" || true
+              exit 1
+            fi
+          }
+
+          echo "[*] Scale down to 1 replica to ease quota pressure"
+          kubectl -n "$NS" scale deploy/actors  --replicas=1 || true
+          kubectl -n "$NS" scale deploy/movies  --replicas=1 || true
+          kubectl -n "$NS" scale deploy/reviews --replicas=1 || true
+          kubectl -n "$NS" scale deploy/users   --replicas=1 || true
+          kubectl -n "$NS" scale deploy/gateway --replicas=1 || true
+
           echo "[*] Patch images with immutable tag $TAG"
-          kubectl -n "$NS" set image deploy/actors   actors=docker.io/${REPO}/actors:$TAG --record=true
-          kubectl -n "$NS" set image deploy/movies   movies=docker.io/${REPO}/movies:$TAG --record=true
-          kubectl -n "$NS" set image deploy/reviews  reviews=docker.io/${REPO}/reviews:$TAG --record=true
-          kubectl -n "$NS" set image deploy/users    users=docker.io/${REPO}/users:$TAG --record=true
-          kubectl -n "$NS" set image deploy/gateway  gateway=docker.io/${REPO}/gateway:$TAG --record=true
+          kubectl -n "$NS" set image deploy/actors   actors=docker.io/zenthic22/actors:$TAG
+          kubectl -n "$NS" set image deploy/movies   movies=docker.io/zenthic22/movies:$TAG
+          kubectl -n "$NS" set image deploy/reviews  reviews=docker.io/zenthic22/reviews:$TAG
+          kubectl -n "$NS" set image deploy/users    users=docker.io/zenthic22/users:$TAG
+          kubectl -n "$NS" set image deploy/gateway  gateway=docker.io/zenthic22/gateway:$TAG
 
           echo "[*] Patch cronjob image"
           kubectl -n "$NS" patch cronjob/cron-insert --type='json' \
-            -p="[{'op':'replace','path':'/spec/jobTemplate/spec/template/spec/containers/0/image','value':'docker.io/${REPO}/cronjob:$TAG'}]"
+            -p="[{'op':'replace','path':'/spec/jobTemplate/spec/template/spec/containers/0/image','value':'docker.io/zenthic22/cronjob:$TAG'}]"
 
-          echo "[*] Wait rollouts"
-          kubectl -n "$NS" rollout status deploy/actors   --timeout=180s
-          kubectl -n "$NS" rollout status deploy/movies   --timeout=180s
-          kubectl -n "$NS" rollout status deploy/reviews  --timeout=180s
-          kubectl -n "$NS" rollout status deploy/users    --timeout=180s
-          kubectl -n "$NS" rollout status deploy/gateway  --timeout=180s
+          # Esperar rollouts (1 réplica)
+          wait_rollout deploy actors  "app=actors"
+          wait_rollout deploy movies  "app=movies"
+          wait_rollout deploy reviews "app=reviews"
+          wait_rollout deploy users   "app=users"
+          wait_rollout deploy gateway "app=gateway"
 
-          echo "[*] Summary"
+          echo "[*] Scale up back to 2 replicas"
+          kubectl -n "$NS" scale deploy/actors  --replicas=2
+          kubectl -n "$NS" scale deploy/movies  --replicas=2
+          kubectl -n "$NS" scale deploy/reviews --replicas=2
+          kubectl -n "$NS" scale deploy/users   --replicas=2
+          kubectl -n "$NS" scale deploy/gateway --replicas=2
+
+          # Esperar nuevamente (por si tarda en programar la 2da réplica)
+          wait_rollout deploy actors  "app=actors"
+          wait_rollout deploy movies  "app=movies"
+          wait_rollout deploy reviews "app=reviews"
+          wait_rollout deploy users   "app=users"
+          wait_rollout deploy gateway "app=gateway"
+
+          echo "[*] Resumen:"
           kubectl -n "$NS" get pods,svc,ingress,hpa
           EOS
           chmod +x deploy.sh
 
-      - name: Copy repo (k8s/ + script) to master
+      - name: Copy k8s/ and script to master
         uses: appleboy/scp-action@v0.1.7
         with:
-            host: ${{ secrets.SSH_HOST }}
-            username: ${{ secrets.SSH_USER }}
-            key: ${{ secrets.SSH_KEY }}
-            port: 22
-            source: "./k8s/**,deploy.sh"
-            target: "/home/${{ secrets.SSH_USER }}/sa-p5/"
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }} # deja vacío si tu llave no tiene passphrase
+          port: 22
+          source: "./k8s/**,deploy.sh"
+          target: "/home/${{ secrets.SSH_USER }}/sa-p5/"
 
       - name: SSH deploy
         uses: appleboy/ssh-action@v1.2.0
@@ -152,14 +181,17 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           port: 22
           script_stop: true
           command_timeout: 30m
           envs: REPO
           script: |
             set -euo pipefail
-            export REPO="${{ env.REPO }}"
+            export REPO="${REPO:-zenthic22}"
+            mkdir -p ~/sa-p5
             cd ~/sa-p5
+            # kubeconfig del master
             if [ ! -f ~/.kube/config ]; then
               mkdir -p ~/.kube
               sudo cat /etc/kubernetes/admin.conf > ~/.kube/config
