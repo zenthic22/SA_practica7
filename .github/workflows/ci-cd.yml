@@ -142,7 +142,6 @@ jobs:
             host: ${{ secrets.SSH_HOST }}
             username: ${{ secrets.SSH_USER }}
             key: ${{ secrets.SSH_KEY }}
-            passphrase: ${{ secrets.SSH_PASSPHRASE }}
             port: 22
             source: "./k8s/**,deploy.sh"
             target: "/home/${{ secrets.SSH_USER }}/sa-p5/"
