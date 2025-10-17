@@ -1,0 +1,168 @@
+name: CI/CD – SA P7
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY_USER: ${{ secrets.DOCKERHUB_USER }}
+  REGISTRY_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  REGISTRY: docker.io
+  REPO: zenthic22
+  # Lista de microservicios (carpetas a construir)
+  SERVICES: |
+    gateway
+    movies
+    actors
+    reviews
+    users
+    cronjob-runner
+
+jobs:
+  build_push:
+    name: Build & Push Docker images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set short SHA
+        id: vars
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_TOKEN }}
+
+      - name: Build & Push (matrix-like loop)
+        run: |
+          set -euo pipefail
+          TAG=${{ steps.vars.outputs.SHORT_SHA }}
+          for svc in $SERVICES; do
+            # detect Dockerfile path y contexto
+            case "$svc" in
+              cronjob-runner) ctx="cronjob-runner"; img="$REPO/cronjob";;
+              *)               ctx="$svc";           img="$REPO/$svc";;
+            esac
+            echo "==> Building $img from $ctx"
+            docker build -t $REGISTRY/$img:latest -t $REGISTRY/$img:$TAG $ctx
+            docker push $REGISTRY/$img:latest
+            docker push $REGISTRY/$img:$TAG
+          done
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          REPO: ${{ env.REPO }}
+          SERVICES: ${{ env.SERVICES }}
+
+      - name: Export image tags (artifact)
+        run: |
+          echo "${{ steps.vars.outputs.SHORT_SHA }}" > image_tag.txt
+        shell: bash
+
+      - name: Upload image tag artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image_tag
+          path: image_tag.txt
+
+  deploy_via_ssh:
+    name: Deploy to K8s (via SSH on master)
+    runs-on: ubuntu-latest
+    needs: [build_push]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download image tag
+        uses: actions/download-artifact@v4
+        with:
+          name: image_tag
+          path: .
+
+      - name: Read tag
+        id: tag
+        run: echo "TAG=$(cat image_tag.txt)" >> $GITHUB_OUTPUT
+
+      - name: Prepare deploy script
+        run: |
+          cat > deploy.sh <<'EOS'
+          set -euo pipefail
+
+          NS=sa-p5
+          TAG="$1"
+
+          echo "[*] kubectl context:"
+          kubectl cluster-info || true
+
+          echo "[*] Apply all manifests"
+          kubectl -n "$NS" apply -f k8s/mysql/
+          kubectl -n "$NS" apply -f k8s/actors/
+          kubectl -n "$NS" apply -f k8s/movies/
+          kubectl -n "$NS" apply -f k8s/reviews/
+          kubectl -n "$NS" apply -f k8s/users/
+          kubectl -n "$NS" apply -f k8s/gateway/
+          kubectl -n "$NS" apply -f k8s/cronjob/
+
+          echo "[*] Patch images with immutable tag $TAG (evita cache de :latest)"
+          kubectl -n "$NS" set image deploy/actors   actors=docker.io/zenthic22/actors:$TAG --record=true
+          kubectl -n "$NS" set image deploy/movies   movies=docker.io/zenthic22/movies:$TAG --record=true
+          kubectl -n "$NS" set image deploy/reviews  reviews=docker.io/zenthic22/reviews:$TAG --record=true
+          kubectl -n "$NS" set image deploy/users    users=docker.io/zenthic22/users:$TAG --record=true
+          kubectl -n "$NS" set image deploy/gateway  gateway=docker.io/zenthic22/gateway:$TAG --record=true
+          # CronJob: actualiza template (tomará efecto en siguientes ejecuciones)
+          kubectl -n "$NS" patch cronjob/cron-insert --type='json' \
+            -p="[{'op':'replace','path':'/spec/jobTemplate/spec/template/spec/containers/0/image','value':'docker.io/zenthic22/cronjob:$TAG'}]"
+
+          echo "[*] Esperando rollouts..."
+          kubectl -n "$NS" rollout status deploy/actors   --timeout=120s
+          kubectl -n "$NS" rollout status deploy/movies   --timeout=120s
+          kubectl -n "$NS" rollout status deploy/reviews  --timeout=120s
+          kubectl -n "$NS" rollout status deploy/users    --timeout=120s
+          kubectl -n "$NS" rollout status deploy/gateway  --timeout=120s
+
+          echo "[*] Resumen:"
+          kubectl -n "$NS" get pods,svc,ingress,hpa
+          EOS
+          chmod +x deploy.sh
+
+      - name: Copy repo (k8s/ + script) to master
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          source: "k8s/*,deploy.sh"
+          target: "/home/${{ secrets.SSH_USER }}/sa-p5/"
+
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+            cd ~/sa-p5
+            # Asegura kubeconfig del master:
+            if [ ! -f ~/.kube/config ]; then
+              mkdir -p ~/.kube
+              sudo cat /etc/kubernetes/admin.conf > ~/.kube/config
+              chmod 600 ~/.kube/config
+            fi
+            ./deploy.sh "${{ steps.tag.outputs.TAG }}"

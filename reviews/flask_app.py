@@ -9,12 +9,13 @@ def create_app():
     app.config.from_object(config['development']())
     app.config.setdefault('PORT', int(os.getenv('PORT', 5002)))
 
+    # Endpoint GraphQL
     app.add_url_rule(
         '/reviews',
         view_func=GraphQLView.as_view(
             'graphql',
             schema=schema,
-            graphiql=True
+            graphiql=True  # UI de GraphiQL para probar queries
         )
     )
 
@@ -22,5 +23,4 @@ def create_app():
     def healthz():
         return "ok", 200
 
-    print(f"reviews corriendo en puerto {app.config['PORT']}")
     return app

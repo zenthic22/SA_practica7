@@ -7,9 +7,8 @@ metadata:
 spec:
   selector:
     app: gateway
-  type: NodePort
+  type: ClusterIP
   ports:
     - name: http
       port: 4001
       targetPort: http
-      nodePort: 30081   # <- expuesto en los nodos

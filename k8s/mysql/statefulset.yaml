@@ -17,6 +17,11 @@ spec:
         app: mysql
     spec:
       terminationGracePeriodSeconds: 30
+      securityContext:
+        fsGroup: 999           # mysql user/group en la imagen oficial suele ser 999
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
       containers:
         - name: mysql
           image: mysql:8.0
@@ -30,6 +35,7 @@ spec:
                 secretKeyRef:
                   name: mysql-secret
                   key: MYSQL_ROOT_PASSWORD
+            # NOTA: No definimos MYSQL_DATABASE/USER/PASSWORD porque inicializamos vía SQL
           volumeMounts:
             - name: data
               mountPath: /var/lib/mysql
@@ -61,7 +67,7 @@ spec:
           app: mysql
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: local-path   # <-- usa 'local-path' (o quita esta línea si ya es la default)
+        # storageClassName: <deja que Kubespray use la default en la nube>
         resources:
           requests:
             storage: 10Gi

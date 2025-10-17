@@ -9,6 +9,7 @@ metadata:
     app.kubernetes.io/part-of: sa-p5
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: movies
@@ -21,7 +22,7 @@ spec:
     spec:
       containers:
         - name: movies
-          image: docker.io/zenthic22/movies:v1
+          image: docker.io/zenthic22/movies:c4b58f6
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -60,5 +61,3 @@ spec:
           resources:
             requests: { cpu: "100m", memory: "128Mi" }
             limits:   { cpu: "300m", memory: "256Mi" }
-      imagePullSecrets:
-        - name: regcred

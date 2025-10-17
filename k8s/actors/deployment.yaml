@@ -9,6 +9,7 @@ metadata:
     app.kubernetes.io/part-of: sa-p5
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: actors
@@ -21,7 +22,7 @@ spec:
     spec:
       containers:
         - name: actors
-          image: docker.io/zenthic22/actors:v1
+          image: docker.io/zenthic22/actors:c4b58f6
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 4000
@@ -68,5 +69,3 @@ spec:
             limits:
               cpu: "300m"
               memory: "256Mi"
-      imagePullSecrets:
-        - name: regcred

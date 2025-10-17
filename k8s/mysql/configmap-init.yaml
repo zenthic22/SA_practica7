@@ -48,11 +48,22 @@ data:
       email VARCHAR(255) UNIQUE NOT NULL
     );
 
+  cron_db.sql: |
+    CREATE DATABASE IF NOT EXISTS cron_db;
+    USE cron_db;
+    CREATE TABLE IF NOT EXISTS cron_events (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      carnet VARCHAR(20) NOT NULL,
+      message VARCHAR(255) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
   grants.sql: |
-    -- Crea usuario appuser y permisos para todas las DB
+    -- Usuario de aplicación y permisos
     CREATE USER IF NOT EXISTS 'appuser'@'%' IDENTIFIED BY 'apppass';
     GRANT ALL PRIVILEGES ON actors_db.*  TO 'appuser'@'%';
     GRANT ALL PRIVILEGES ON movies_db.*  TO 'appuser'@'%';
     GRANT ALL PRIVILEGES ON reviews_db.* TO 'appuser'@'%';
     GRANT ALL PRIVILEGES ON users_db.*   TO 'appuser'@'%';
+    GRANT ALL PRIVILEGES ON cron_db.* TO 'appuser'@'%';
     FLUSH PRIVILEGES;

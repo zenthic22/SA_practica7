@@ -6,6 +6,7 @@ metadata:
   labels: { app: gateway }
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
   selector:
     matchLabels: { app: gateway }
   template:
@@ -14,7 +15,7 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: docker.io/zenthic22/gateway:v1   # <--- cambia esto
+          image: docker.io/zenthic22/gateway:c4b58f6
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

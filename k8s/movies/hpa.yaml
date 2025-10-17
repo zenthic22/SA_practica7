@@ -10,7 +10,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: movies
-  minReplicas: 1
+  minReplicas: 2   # opcional: 2 para HA
   maxReplicas: 3
   metrics:
     - type: Resource

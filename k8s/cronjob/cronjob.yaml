@@ -4,13 +4,19 @@ metadata:
   name: cron-insert
   namespace: sa-p5
 spec:
-  schedule: "*/2 * * * *"               # cada 2 minutos
+  schedule: "*/2 * * * *"              # cada 2 minutos
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 60
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
+      backoffLimit: 3
       ttlSecondsAfterFinished: 120
       template:
+        metadata:
+          labels:
+            app: cronjob               # label fijo para NetPol/logs
         spec:
           restartPolicy: OnFailure
           securityContext:
@@ -18,7 +24,7 @@ spec:
             runAsUser: 10001
           containers:
             - name: runner
-              image: docker.io/zenthic22/cron-insert:v1   # <--- tu imagen
+              image: docker.io/zenthic22/cronjob:v2   # usa tu tag real
               imagePullPolicy: IfNotPresent
               env:
                 - name: DB_HOST
@@ -38,7 +44,7 @@ spec:
                       name: mysql-secret
                       key: MYSQL_PASSWORD
                 - name: CARNET
-                  value: "201807169"
+                  value: "201807169"   # tu carnet
               resources:
                 requests:
                   cpu: "50m"

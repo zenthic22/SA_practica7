@@ -10,14 +10,19 @@ spec:
   policyTypes: ["Ingress","Egress"]
   ingress:
     - from:
-        - podSelector: {}  # opcional, para pruebas internas en el NS
+        # Permite tráfico desde el Ingress Controller (ajusta el namespace si difiere)
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+              app.kubernetes.io/component: controller
       ports:
         - protocol: TCP
           port: 4001
   egress:
+    # Llamadas a tus microservicios internos
     - to:
         - namespaceSelector:
             matchLabels:
@@ -28,14 +33,18 @@ spec:
                 operator: In
                 values: ["actors","movies","reviews","users"]
       ports:
-        - { protocol: TCP, port: 3000 }
         - { protocol: TCP, port: 4000 }
+        - { protocol: TCP, port: 3000 }
         - { protocol: TCP, port: 5002 }
         - { protocol: TCP, port: 5003 }
+    # DNS hacia CoreDNS
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
       ports:
         - { protocol: UDP, port: 53 }
         - { protocol: TCP, port: 53 }
