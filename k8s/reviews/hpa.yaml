@@ -10,7 +10,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: reviews
-  minReplicas: 2    # opcional: 2 para HA
+  minReplicas: 2
   maxReplicas: 3
   metrics:
     - type: Resource

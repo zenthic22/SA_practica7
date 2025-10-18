@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-gateway-from-tester
+  namespace: sa-p5
+spec:
+  podSelector:
+    matchLabels:
+      app: gateway
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              role: tester
+      ports:
+        - protocol: TCP
+          port: 4001

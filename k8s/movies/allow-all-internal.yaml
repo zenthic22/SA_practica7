@@ -1,0 +1,14 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all-internal
+  namespace: sa-p5
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress","Egress"]
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}

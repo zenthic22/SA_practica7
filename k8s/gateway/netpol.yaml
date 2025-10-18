@@ -9,8 +9,15 @@ spec:
       app: gateway
   policyTypes: ["Ingress","Egress"]
   ingress:
+    # 1) Permite tráfico externo (NodePort -> pod) al puerto 4001
     - from:
-        # Permite tráfico desde el Ingress Controller (ajusta el namespace si difiere)
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 4001
+    # 2) (Opcional) Mantén permiso desde el Ingress Controller por si lo reactivas
+    - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ingress-nginx
@@ -22,7 +29,7 @@ spec:
         - protocol: TCP
           port: 4001
   egress:
-    # Llamadas a tus microservicios internos
+    # Microservicios internos
     - to:
         - namespaceSelector:
             matchLabels:
@@ -37,7 +44,7 @@ spec:
         - { protocol: TCP, port: 3000 }
         - { protocol: TCP, port: 5002 }
         - { protocol: TCP, port: 5003 }
-    # DNS hacia CoreDNS
+    # DNS
     - to:
         - namespaceSelector:
             matchLabels:

@@ -3,12 +3,14 @@ kind: Service
 metadata:
   name: gateway
   namespace: sa-p5
-  labels: { app: gateway }
+  labels:
+    app: gateway
 spec:
   selector:
     app: gateway
-  type: ClusterIP
+  type: NodePort
   ports:
     - name: http
-      port: 4001
-      targetPort: http
+      port: 4001         # Puerto interno del servicio
+      targetPort: http   # Nombre del puerto en el contenedor
+      nodePort: 32001    # Puerto expuesto en los nodos (puedes cambiarlo si está ocupado)

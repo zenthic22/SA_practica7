@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-from-anyns
+  namespace: sa-p5
+spec:
+  podSelector:
+    matchLabels:
+      app: gateway
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector: {}   # permite desde cualquier namespace
+      ports:
+        - protocol: TCP
+          port: 4001

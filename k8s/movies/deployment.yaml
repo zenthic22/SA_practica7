@@ -44,8 +44,8 @@ spec:
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: mysql-secret
-                  key: MYSQL_PASSWORD
+                  name: mysql-secret     # nombre del Secret
+                  key: MYSQL_PASSWORD    # clave dentro del Secret
           readinessProbe:
             httpGet: { path: /healthz, port: http }
             initialDelaySeconds: 5

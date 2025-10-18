@@ -8,8 +8,11 @@ spec:
     matchLabels:
       app: actors
   policyTypes: ["Ingress","Egress"]
+
+  # === ENTRADAS PERMITIDAS ===
   ingress:
     - from:
+        # Solo el gateway puede acceder a /actors
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: sa-p5
@@ -19,7 +22,10 @@ spec:
       ports:
         - protocol: TCP
           port: 4000
+
+  # === SALIDAS PERMITIDAS ===
   egress:
+    # Hacia la base de datos MySQL
     - to:
         - namespaceSelector:
             matchLabels:
@@ -30,6 +36,8 @@ spec:
       ports:
         - protocol: TCP
           port: 3306
+
+    # Hacia el DNS de Kubernetes (CoreDNS)
     - to:
         - namespaceSelector:
             matchLabels:
@@ -38,5 +46,7 @@ spec:
             matchLabels:
               k8s-app: kube-dns
       ports:
-        - { protocol: UDP, port: 53 }
-        - { protocol: TCP, port: 53 }
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
