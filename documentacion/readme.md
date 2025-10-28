@@ -1283,7 +1283,7 @@ Flujo 3
 
 ### 9. Contratos de microservicios
 
-https://app.getpostman.com/join-team?invite_code=d0b816aa753da2efee4bdc4f4b1e080c457f87e10c2dfe5aaeb0bbe9d2685db6&target_code=73ca77e7c4d8471f3f5c27edaded706a
+https://app.getpostman.com/join-team?invite_code=9e8104ed00b7070ec0ef43b81e4dad553c0f01660d2e16edb5cfe0c00edaa1ec&target_code=3830c3eb7c0376a4e50db820306e8f39
 
 ### 10. Diagrama de arquitectura
 

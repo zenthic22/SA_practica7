@@ -44,6 +44,8 @@ def create_movie():
     title = data.get('title')
     year = data.get('year')
     genre = data.get('genre')
+    value = "calificacion"
+    title2 = "practica7"
 
     mydb, err = dbConnection()
     if mydb is None:
@@ -56,7 +58,9 @@ def create_movie():
         mydb.commit()
         cursor.close()
         mydb.close()
-        return jsonify({ 'message': 'Pelicula creada exitosamente', 'id': movie_id }), 201
+        print(value, title2)
+        return jsonify({ 'message': 'Pelicula creada exitosamente', 'id': movie_id, 'valor': value, 'practica': title2 }), 201
+
     except Exception as ex:
         return jsonify({'message': f'Error al crear película: {ex}'}), 400
     
